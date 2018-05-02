@@ -8,6 +8,9 @@
 #include <sys/types.h>
 #include <iostream>
 #include <fstream>
+#include <string>
+#include <vector>
+#include <algorithm>
 
 using namespace std;
 
@@ -16,6 +19,15 @@ typedef struct{
     int64_t codedSize;
 } tBWTED;
 
+typedef struct record_index{
+    char key;
+    uint64_t index;
+};
+
+typedef struct  record_index_index{
+    uint64_t key;
+    uint64_t index;
+};
 
 /* bwted – záznam o kódování
 inputFile – vstupní soubor (nekódovaný)
@@ -30,5 +42,8 @@ outputFile – výstupní soubor (dekódovaný)
 návratová hodnota – 0 dekódování proběhlo v pořádku,-1 při dekódování nastala chyba */
 int BWTDecoding(tBWTED *ahed, istream& inputFile, ostream& outputFile);
 
+/*1st step - b-w transformation, return string of same length in different order*/
+string bwt_encode(string * decoded);
+string bwt_decode(string * encoded);
 
 #endif //KKO_BWTED_H
