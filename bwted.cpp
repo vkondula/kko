@@ -1,5 +1,7 @@
 #include "bwted.h"
 
+#define MTF_SIZE '\x40'
+
 using namespace std;
 
 /*sort array<record_index> by first character*/
@@ -34,6 +36,87 @@ struct comparator {
         return false;
     }
 } comparator1;
+
+
+string rle_encode(string * decoded) {
+    string encoded;
+    unsigned char counter = 0;
+    for (unsigned long i = 0 ; i < decoded->size(); i++){
+        if ((*decoded)[i] == 0 && counter != 255) {
+            counter++;
+        } else {
+            if (counter != 0){
+                encoded += (char)'\0';
+                encoded += counter;
+                counter = 0;
+            }
+            if ((*decoded)[i] == 0){
+                counter ++;
+            } else {
+                encoded += (*decoded)[i];
+            }
+        }
+    }
+    if (counter != 0){
+        encoded += (char)'\0';
+        encoded += counter;
+    }
+    return encoded;
+}
+
+string rle_decode(string * encoded) {
+    string decoded;
+    for (unsigned long i = 0 ; i < encoded->size(); i++){
+        if ((*encoded)[i] != '\0'){
+            decoded += (*encoded)[i];
+        }
+        else {
+            string s((unsigned char)(*encoded)[++i], '\0');
+            decoded += s;
+        }
+    }
+    return decoded;
+}
+
+
+string mtf_encode(string * decoded) {
+    vector<char> table;
+    vector<char>::iterator it;
+    string encoded_str;
+    for (unsigned long i = 0 ; i < decoded->size(); i++){
+        it = find(table.begin(), table.end(), (*decoded)[i]);
+        if (it == table.end()){ //not found
+            encoded_str += char(table.size());
+        } else {
+            encoded_str += char(table.end() - it - 1);
+            table.erase(it);
+        }
+        table.push_back((*decoded)[i]);
+    }
+    string table_str(table.begin(), table.end());
+    return char(table.size()) + table_str + encoded_str;
+}
+
+string mtf_decode(string * encoded) {
+    //recreate table
+    string decoded;
+    vector<char> table(encoded->begin() + 1, encoded->begin() + 1 + (*encoded)[0]);
+    unsigned long table_size = table.size();
+    for (unsigned long i = encoded->size() - 1 ; i > table_size; i--){
+        if ((unsigned char)(*encoded)[i] < table_size) {
+            char c = table.at(table.size() - 1);
+            decoded += c;
+            if ((*encoded)[i] != 0){
+                table.pop_back();
+                table.insert(table.end() - (*encoded)[i], c);
+            }
+        } else {
+            cerr << "invalid encoding!!!\n";
+        }
+    }
+    reverse(decoded.begin(), decoded.end());
+    return decoded;
+}
 
 string bwt_encode(string * decoded){
     (*decoded) += '\x03';
@@ -81,8 +164,10 @@ int BWTEncoding(tBWTED *bwted, istream& inputFile, ostream& outputFile) {
     string decoded((istreambuf_iterator<char>(inputFile)), (istreambuf_iterator<char>()));
     // 1st step bwt
     string btw_encoded = bwt_encode(&decoded);
-    outputFile << btw_encoded;
-    cout << btw_encoded;
+    string mtf_encoded = mtf_encode(&btw_encoded);
+    string rle_encoded = rle_encode(&mtf_encoded);
+    outputFile << rle_encoded;
+    cout << rle_encoded;
     return 0;
 }
 
@@ -91,7 +176,9 @@ int BWTEncoding(tBWTED *bwted, istream& inputFile, ostream& outputFile) {
 int BWTDecoding(tBWTED *ahed, istream& inputFile, ostream& outputFile) {
     string encoded((istreambuf_iterator<char>(inputFile)), (istreambuf_iterator<char>()));
     // 1st step bwt
-    string btw_decoded = bwt_decode(&encoded);
+    string rle_decoded = rle_decode(&encoded);
+    string mtf_decoded = mtf_decode(&rle_decoded);
+    string btw_decoded = bwt_decode(&mtf_decoded);
     outputFile << btw_decoded;
     cout << btw_decoded;
     return 0;
