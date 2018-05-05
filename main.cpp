@@ -49,8 +49,6 @@ int main(int argc, char ** argv) {
     }
     int retval = 0;
     tBWTED result;
-    result.codedSize = 1;
-    result.uncodedSize = 2;
     if (!mode){
         cerr << "One of (-x|-c) must be set. Please read help:\n"
              << "./bwted -h\n";
@@ -66,7 +64,6 @@ int main(int argc, char ** argv) {
             << "codedSize = " << result.codedSize << "\n";
         log.close();
     }
-    cout << "retval: " << retval << endl;
-    return 0;
+    return retval ? 1 : 0;
 }
 

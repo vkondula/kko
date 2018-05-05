@@ -14,6 +14,9 @@
 #include <algorithm>
 #include <cmath>
 #include <map>
+#include <istream>
+#include <ostream>
+#include <climits>
 
 using namespace std;
 
@@ -56,19 +59,19 @@ int BWTDecoding(tBWTED *ahed, istream& inputFile, ostream& outputFile);
 
 /*1st step - b-w transformation, return string of same length in different order*/
 string bwt_encode(string * decoded);
-string bwt_decode(string * encoded);
+string bwt_decode(string * encoded, char * error);
 
 /*2nd step - move to front alg, dynamically create table of all chars in string, encode chars as positions*/
 string mtf_encode(string * decoded);
-string mtf_decode(string * encoded);
+string mtf_decode(string * encoded, char * error);
 
 /*3rd step - zero run length encoding , all sequences of zeros are replaced by 2 chars, ('\0', <number of zeros>)*/
 string rle_encode(string * decoded);
-string rle_decode(string * encoded);
+string rle_decode(string * encoded, char * error);
 
 /*4th step - huffman encoding, dynamic*/
 string huf_encode(string * decoded);
-string huf_decode(string * encoded);
+string huf_decode(string * encoded, char * error);
 
 class HuffmanDecoder {
     string * input;

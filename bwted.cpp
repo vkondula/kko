@@ -1,7 +1,5 @@
 #include "bwted.h"
 
-#define MTF_SIZE '\x40'
-
 using namespace std;
 
 /*sort array<record_index> by first character*/
@@ -66,7 +64,7 @@ string huf_encode(string * decoded) {
         int min_1_ptr = -1;
         unsigned long long min_0_value = ULONG_MAX;
         unsigned long long min_1_value = ULONG_MAX;
-        for (int i = 0 ; i < build.size(); i++){
+        for (unsigned int i = 0 ; i < build.size(); i++){
             if (build[i].sum < min_0_value){
                 min_1_value = min_0_value;
                 min_1_ptr = min_0_ptr;
@@ -106,7 +104,6 @@ string huf_encode(string * decoded) {
     }
     encoded += (char)'\0';
     //encode input
-    unsigned int fml = encoded.size();
     for (unsigned long i = 0; i < decoded->size(); i ++){
         encoder.add(&(lookup[(*decoded)[i]]));
     }
@@ -115,7 +112,7 @@ string huf_encode(string * decoded) {
 }
 
 
-string huf_decode(string * encoded) {
+string huf_decode(string * encoded, char * error) {
     string decoded;
     unsigned int ptr = 0;
     //recreate huffman tree
@@ -127,10 +124,14 @@ string huf_decode(string * encoded) {
         HuffmanDecoder decoder(encoded, ptr);
         unsigned long value = 1;
         for (unsigned long i = 0; i < size ; i++){
-            if (decoder.get_bit()){
+            char retval = decoder.get_bit();
+            if (retval == 1){
                 value += (value*2) + 1;
-            } else {
+            } else if (retval == 0) {
                 value += value*2;
+            } else { // read out of range
+                (*error) = 1;
+                return "";
             }
         }
         values.push_back(value);
@@ -146,14 +147,14 @@ string huf_decode(string * encoded) {
             value += (value * 2) + 1;
         } else if (retval == 0) {
             value += value * 2;
-        } else {
-            cerr << "decoding failed\n";
-            break;
+        } else { // read out of range
+            (*error) = 1;
+            return "";
         }
         vector<unsigned long>::iterator it = find(values.begin(), values.end(), value);
         if (it != values.end()) {
             long index = distance(values.begin(), it);
-            if (index == (values.size() - 1)) {
+            if (index == (long)(values.size() - 1)) { //end of sequence code
                 break;
             }
             decoded += keys[index];
@@ -190,13 +191,12 @@ string rle_encode(string * decoded) {
     return encoded;
 }
 
-string rle_decode(string * encoded) {
+string rle_decode(string * encoded, char * error) {
     string decoded;
     for (unsigned long i = 0 ; i < encoded->size(); i++){
         if ((*encoded)[i] != '\0'){
             decoded += (*encoded)[i];
-        }
-        else {
+        } else {
             string s((unsigned char)(*encoded)[++i], '\0');
             decoded += s;
         }
@@ -223,7 +223,7 @@ string mtf_encode(string * decoded) {
     return char(table.size()) + table_str + encoded_str;
 }
 
-string mtf_decode(string * encoded) {
+string mtf_decode(string * encoded, char * error) {
     //recreate table
     string decoded;
     vector<char> table(encoded->begin() + 1, encoded->begin() + 1 + (*encoded)[0]);
@@ -237,7 +237,8 @@ string mtf_decode(string * encoded) {
                 table.insert(table.end() - (*encoded)[i], c);
             }
         } else {
-            cerr << "invalid encoding!!!\n";
+            (*error) = 1;
+            return "";
         }
     }
     reverse(decoded.begin(), decoded.end());
@@ -248,11 +249,13 @@ string bwt_encode(string * decoded){
     (*decoded) += '\x03';
     vector<record_index> table;
     string encoded;
+    // build the table, with pointers to decoded string to reduce size
     for (unsigned long i = 0 ; i < decoded->size(); i++){
         record_index tmp = {(char)(*decoded)[i != 0 ? i - 1 : decoded->size() - 1], i};
         table.push_back(tmp);
     }
     comparator1.encoded = decoded;
+    // sort by pointer
     stable_sort(table.begin(), table.end(), comparator1);
     for (unsigned long i = 0 ; i < decoded->size(); i++){
         encoded += table.at(i).key;
@@ -260,7 +263,7 @@ string bwt_encode(string * decoded){
     return encoded;
 }
 
-string bwt_decode(string * encoded){ //L
+string bwt_decode(string * encoded, char * error){
     std::vector<record_index> table;
     for (unsigned long i = 0; i < encoded->size(); i++){ //EOF INCLUDED
         record_index tmp = {(char)(*encoded)[i], i};
@@ -293,19 +296,26 @@ int BWTEncoding(tBWTED *bwted, istream& inputFile, ostream& outputFile) {
     string mtf_encoded = mtf_encode(&btw_encoded);
     string rle_encoded = rle_encode(&mtf_encoded);
     string huf_encoded = huf_encode(&rle_encoded);
+    bwted->uncodedSize = (int64_t) decoded.size();
+    bwted->codedSize = (int64_t) huf_encoded.size();
     outputFile << huf_encoded;
-    cout << huf_encoded;
     return 0;
 }
 
 
 int BWTDecoding(tBWTED *ahed, istream& inputFile, ostream& outputFile) {
+    char retval = 0;
     string encoded((istreambuf_iterator<char>(inputFile)), (istreambuf_iterator<char>()));
-    string huf_decoded = huf_decode(&encoded);
-    string rle_decoded = rle_decode(&huf_decoded);
-    string mtf_decoded = mtf_decode(&rle_decoded);
-    string btw_decoded = bwt_decode(&mtf_decoded);
+    string huf_decoded = huf_decode(&encoded, &retval);
+    if (retval) return -1;
+    string rle_decoded = rle_decode(&huf_decoded, &retval);
+    if (retval) return -1;
+    string mtf_decoded = mtf_decode(&rle_decoded, &retval);
+    if (retval) return -1;
+    string btw_decoded = bwt_decode(&mtf_decoded, &retval);
+    if (retval) return -1;
+    ahed->codedSize = (int64_t) encoded.size();
+    ahed->uncodedSize = (int64_t) btw_decoded.size();
     outputFile << btw_decoded;
-    cout << btw_decoded;
     return 0;
 }
